@@ -1,0 +1,135 @@
+{
+    // This is the default settings.json file for the Fortran extension.
+    "fortran.linter.compiler": "gfortran", // "Enabled" or "Disabled" for the compiler linter
+
+    // NOTE: A linter is a tool that analyzes source code to flag programming errors, bugs, stylistic errors, 
+    // and suspicious constructs.
+
+    //--------------------------------------------------------------------------------------------------------------------------
+    // Set the path to the Fortran compiler executable. This is required for the extension to work.
+
+    // My laptop/desktop
+    "fortran.linterExecutablePath": "C:\\Users\\bryan\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\fortls.exe",
+
+    // CU Desktop
+    //"fortran.linterExecutablePath": "/usr/bin/fortls",
+
+
+    //--------------------------------------------------------------------------------------------------------------------------
+
+    "fortran.linterArgs": ["--lint", "--format", "json"],
+    // Arguments to pass to the Fortran linter
+
+    "fortran.linterFormat": "json", // "json" or "text" for the linter output format
+
+    "fortran.fortls.disabled": false,
+    // true = disable the Fortran Language Server (you won't get any diagnostics)
+    // false = enable the Fortran Language Server (you will get diagnostics)
+
+    //-------------------------------------------------------------------------------------
+    // Cool and useful stuff to add to your settings.json file
+
+    // Add a ruler at column 132 so you know when Fortran will give you
+    // a truncation warning
+    "editor.rulers": [132],
+    "workbench.colorCustomizations": {
+        "editorRuler.foreground": "#458cff"
+    },
+    // USE THESE SETTINGS FOR HOME COMPUTERS
+    "fortran.fortls.configure": "C:\\Users\\bryan\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\",
+    "fortran.fortls.path": "C:\\Users\\bryan\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\fortls.exe",
+    "fortran.linter.compilerPath": "C:\\Users\\bryan\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\fortls.exe",
+
+    //USE THIS IF USING CU BOULDER DESKTOP
+    // DO NOT UNCOMMENT THE NEXT LINE UNLESS YOU HAVE A FORTLS TOML FILE
+    //"fortran.fortls.configure": "/usr/bin/fortls", 
+    
+    // "fortran.fortls.path": "/usr/bin/fortls",
+    // "fortran.linter.compilerPath": "/usr/bin/fortls",
+
+
+
+
+    "files.associations": {
+        "*.tcc": "cpp",
+        "chrono": "cpp",
+        "codecvt": "cpp",
+        "cstdint": "cpp",
+        "algorithm": "cpp",
+        "memory_resource": "cpp",
+        "string": "cpp",
+        "system_error": "cpp",
+        "type_traits": "cpp",
+        "utility": "cpp",
+        "iomanip": "cpp",
+        "iosfwd": "cpp",
+        "iostream": "cpp",
+        "istream": "cpp",
+        "ostream": "cpp",
+        "array": "cpp",
+        "atomic": "cpp",
+        "bit": "cpp",
+        "cctype": "cpp",
+        "clocale": "cpp",
+        "cmath": "cpp",
+        "compare": "cpp",
+        "concepts": "cpp",
+        "cstdarg": "cpp",
+        "cstddef": "cpp",
+        "cstdio": "cpp",
+        "cstdlib": "cpp",
+        "ctime": "cpp",
+        "cwchar": "cpp",
+        "cwctype": "cpp",
+        "deque": "cpp",
+        "unordered_map": "cpp",
+        "vector": "cpp",
+        "exception": "cpp",
+        "functional": "cpp",
+        "iterator": "cpp",
+        "memory": "cpp",
+        "numeric": "cpp",
+        "optional": "cpp",
+        "random": "cpp",
+        "ratio": "cpp",
+        "string_view": "cpp",
+        "tuple": "cpp",
+        "initializer_list": "cpp",
+        "limits": "cpp",
+        "new": "cpp",
+        "ranges": "cpp",
+        "sstream": "cpp",
+        "stdexcept": "cpp",
+        "streambuf": "cpp",
+        "typeinfo": "cpp"
+    },
+
+    "latex-workshop.latex.outDir": "%DIR%/../documentation",
+        "latex-workshop.latex.tools": [
+            {
+                "name": "latexmk",
+                "command": "latexmk",
+                "args": [
+                    "--max-print-line=10000",
+                    "-synctex=1",
+                    "-interaction=nonstopmode",
+                    "-file-line-error",
+                    "-pdf",
+                    "-outdir=%OUTDIR%",
+                    "%DOC%"
+                ]
+            }
+        ],
+        "latex-workshop.latex.recipes": [
+            {
+                "name": "latexmk",
+                "tools": ["latexmk"]
+            }
+        ],
+        "[latex]": {
+            "editor.wordWrap": "wordWrapColumn",
+            "editor.wordWrapColumn": 80
+        },
+        "cmake.sourceDirectory": "C:/Users/bryan/OneDrive/CU/Code/NeCTAR/LAPACK_Code",
+        "cmake.ignoreCMakeListsMissing": true
+}
