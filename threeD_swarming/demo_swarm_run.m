@@ -2,7 +2,7 @@ function demo_swarm_run(n, Ls, goal, T, dt, P0, V0, obstacles, obs_params)
 
     % DEMO_SWARM_RUN  Minimal 3D swarm simulator with spacing,
     % heading, altitude, goal tracking, and obstacle avoidance via
-    % short-range repulsive fields (e.g., finite cylinders).
+    % short-range repulsive fields (currently cylinders and flat walls).
 
     %
     % DEMO_SWARM_RUN(N, Ls, goal, T, dt, P0, V0) runs the simulation with
@@ -42,13 +42,45 @@ function demo_swarm_run(n, Ls, goal, T, dt, P0, V0, obstacles, obs_params)
     % Normalize obstacle structs
     for kk = 1:numel(obstacles)
         if ~isfield(obstacles(kk),'type'),   obstacles(kk).type = 'cylinder'; end
-        if strcmpi(obstacles(kk).type,'cylinder')
-            need = {'xy','radius','zmin','zmax'};
-            for f = need
-                if ~isfield(obstacles(kk), f{1})
-                    error('Cylinder obstacle %d missing field "%s".', kk, f{1});
+        switch lower(obstacles(kk).type)
+            case 'cylinder'
+                need = {'xy','radius','zmin','zmax'};
+                for f = need
+                    if ~isfield(obstacles(kk), f{1})
+                        error('Cylinder obstacle %d missing field "%s".', kk, f{1});
+                    end
                 end
-            end
+                if obstacles(kk).radius <= 0
+                    error('Cylinder obstacle %d must have positive radius.', kk);
+                end
+            case 'wall'
+                need = {'center','normal','width','height'};
+                for f = need
+                    if ~isfield(obstacles(kk), f{1})
+                        error('Wall obstacle %d missing field "%s".', kk, f{1});
+                    end
+                end
+                nvec = obstacles(kk).normal(:)';
+                if norm(nvec) < 1e-8
+                    error('Wall obstacle %d normal must be non-zero.', kk);
+                end
+                obstacles(kk).normal = nvec / norm(nvec);
+                if obstacles(kk).width <= 0 || obstacles(kk).height <= 0
+                    error('Wall obstacle %d must have positive width and height.', kk);
+                end
+                if ~isfield(obstacles(kk), 'thickness') || isempty(obstacles(kk).thickness)
+                    obstacles(kk).thickness = 2.0;
+                end
+                if obstacles(kk).thickness <= 0
+                    error('Wall obstacle %d must have positive thickness.', kk);
+                end
+                if ~isfield(obstacles(kk), 'up') || isempty(obstacles(kk).up)
+                    obstacles(kk).up = [];
+                else
+                    obstacles(kk).up = obstacles(kk).up(:)';
+                end
+            otherwise
+                error('Unsupported obstacle type "%s" for obstacle %d.', obstacles(kk).type, kk);
         end
     end
     % Normalize obs_params fields

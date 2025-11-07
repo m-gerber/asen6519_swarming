@@ -23,6 +23,17 @@ obstacles(1).radius = 6.0;
 obstacles(1).zmin   = 0.0;
 obstacles(1).zmax   = 120.0;
 
+% Planar wall (rectangular panel) to stress-test avoidance logic
+obstacles(2).type    = 'wall';
+obstacles(2).center  = [140, 120, 40];   % center of the panel [m]
+obstacles(2).normal  = [-1, 0, 0];       % outward normal direction
+obstacles(2).width   = 45.0;             % span along local u-axis [m]
+obstacles(2).height  = 60.0;             % span along local v-axis [m]
+obstacles(2).up      = [0, 0, 1];        % optional reference to keep panel upright
+obstacles(2).thickness = 8.0;            % finite thickness so drones must route around
+obstacles(2).d_safe    = 25.0;           % extend avoidance bubble for the wall
+obstacles(2).fmax      = 15.0;           % allow stronger braking near the wall
+
 
 obs_params.k_o    = 40.0;   % repulsion gain, larger = stronger repulsion
                             % units = m/s^2
@@ -30,11 +41,21 @@ obs_params.d_safe = 18.0;   %Radius of influence - range at which obstacle avoid
 obs_params.fmax   = 10.0;   %Limit on maximum obstacle avoidance acceleration [m/s^2]
 
 if run_w_obstacles
-    obstacles(1).type   = 'cylinder';
-    obstacles(1).xy     = [100, 100];
-    obstacles(1).radius = 6.0;
-    obstacles(1).zmin   = 0.0;
-    obstacles(1).zmax   = 120.0;   % higher than goal altitude
+    % obstacles(1).type   = 'cylinder';
+    % obstacles(1).xy     = [100, 100];
+    % obstacles(1).radius = 6.0;
+    % obstacles(1).zmin   = 0.0;
+    % obstacles(1).zmax   = 120.0;   % higher than goal altitude
+
+    obstacles(2).type    = 'wall';
+    obstacles(2).center  = [140, 120, 40];
+    obstacles(2).normal  = [-1, 0, 0];
+    obstacles(2).width   = 45.0;
+    obstacles(2).height  = 60.0;
+    obstacles(2).up      = [0, 0, 1];
+    obstacles(2).thickness = 8.0;
+    obstacles(2).d_safe    = 25.0;
+    obstacles(2).fmax      = 15.0;
 
     obs_params.k_o    = 40.0;      % repulsion gain
     obs_params.d_safe = 18.0;      % influence radius
