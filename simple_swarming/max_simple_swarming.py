@@ -2,9 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.widgets import Slider
-from typing import Callable, Tuple, Dict
+from typing import Dict
 
-import json, time
+import json
 
 # ----------------------------
 # Helper functions
@@ -37,6 +37,16 @@ def load_json_params(path="params.json"):
             return json.load(f)
     except Exception:
         return {}
+    
+def save_json_params(params, path="params.json"):
+    """Save selected parameters to JSON so other scripts can read them."""
+    subset = {
+        "W_ALIGNMENT": params["W_ALIGNMENT"],
+        "W_COHESION": params["W_COHESION"],
+        "W_SEPARATION": params["W_SEPARATION"]
+    }
+    with open(path, "w") as f:
+        json.dump(subset, f, indent=4)
 
 
 def update_agents(positions, velocities, leader_pos, leader_vel, params):
@@ -139,6 +149,7 @@ def run_simulation(leader_update_func, params):
         params["W_ALIGNMENT"] = s_align.val
         params["W_COHESION"] = s_cohes.val
         params["W_SEPARATION"] = s_sep.val
+        save_json_params(params)
 
     s_align.on_changed(update_sliders)
     s_cohes.on_changed(update_sliders)
