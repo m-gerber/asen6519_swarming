@@ -6,7 +6,8 @@ function animate_flight_paths(speed_up, data)
     %   csv_dir (directory containing drone_*.csv files)
     %   goal (optional 3x1 goal vector)
     %   obstacles (optional struct array: e.g., cylinders with fields
-    %     type='cylinder', xy=[cx,cy], radius, zmin, zmax)
+    %     type='cylinder', xy=[cx,cy], radius, zmin, zmax) and walls with
+    %     type='wall', center, normal, width, height (optional up vector)
     %   obs_style (optional struct: color, alpha, edgecolor)
     %   output_file (optional video path, default swarm_animation.mp4)
 
@@ -178,6 +179,13 @@ function draw_obstacles(ax, obstacles, style)
                 fill3(ax, xc, yc, z0*ones(size(th)), col, 'EdgeColor', edg, 'FaceAlpha', alp);
                 fill3(ax, xc, yc, z1*ones(size(th)), col, 'EdgeColor', edg, 'FaceAlpha', alp);
 
+            case 'wall'
+                frame = wall_geometry(obs);
+                verts = wall_vertices(frame);
+                faces = [1 2 3 4; 5 6 7 8; 1 2 6 5; 2 3 7 6; 3 4 8 7; 4 1 5 8];
+                patch(ax, 'Faces', faces, 'Vertices', verts, ...
+                    'FaceColor', col, 'EdgeColor', edg, 'FaceAlpha', alp);
+
             % Extend with spheres/boxes if needed
         end
     end
@@ -194,6 +202,12 @@ function [xr, yr, zr] = obstacle_bounds(obstacles)
                 xmin = min(xmin, cx - R); xmax = max(xmax, cx + R);
                 ymin = min(ymin, cy - R); ymax = max(ymax, cy + R);
                 zmin = min(zmin, obs.zmin);  zmax = max(zmax, obs.zmax);
+            case 'wall'
+                frame = wall_geometry(obs);
+                pts = wall_vertices(frame);
+                xmin = min(xmin, min(pts(:,1))); xmax = max(xmax, max(pts(:,1)));
+                ymin = min(ymin, min(pts(:,2))); ymax = max(ymax, max(pts(:,2)));
+                zmin = min(zmin, min(pts(:,3))); zmax = max(zmax, max(pts(:,3)));
         end
     end
     if isinf(xmin) % no obstacles
@@ -236,5 +250,71 @@ function rng_out = expand_range(rng_in, margin)
     else
         pad = span * margin;
         rng_out = [rng_in(1)-pad, rng_in(2)+pad];
+    end
+end
+
+function geom = wall_geometry(obs)
+% Derive orthonormal frame and dimensions for a rectangular wall obstacle
+    geom.center = obs.center(:)';
+    n = obs.normal(:)';
+    if norm(n) < 1e-8
+        error('Wall obstacle normal must be non-zero.');
+    end
+    geom.normal = n / norm(n);
+
+    if isfield(obs,'up') && ~isempty(obs.up)
+        up_vec = obs.up(:)';
+    else
+        up_vec = pick_orthogonal_vec(geom.normal);
+    end
+    up_vec = up_vec - dot(up_vec, geom.normal) * geom.normal;
+    if norm(up_vec) < 1e-8
+        up_vec = pick_orthogonal_vec(geom.normal);
+    end
+    up_vec = up_vec / max(norm(up_vec), 1e-9);
+
+    u = cross(geom.normal, up_vec);
+    if norm(u) < 1e-8
+        up_vec = pick_orthogonal_vec(geom.normal);
+        u = cross(geom.normal, up_vec);
+    end
+    geom.u = u / norm(u);
+    geom.v = cross(geom.normal, geom.u);
+    geom.v = geom.v / norm(geom.v);
+    geom.half_w = obs.width / 2;
+    geom.half_h = obs.height / 2;
+    if isfield(obs,'thickness') && ~isempty(obs.thickness)
+        geom.half_t = obs.thickness / 2;
+    else
+        geom.half_t = 1.0;
+    end
+end
+
+function v = pick_orthogonal_vec(n_hat)
+% Return a vector orthogonal (or close) to n_hat for basis construction
+    [~, idx] = min(abs(n_hat));
+    basis = zeros(1,3);
+    basis(idx) = 1;
+    v = cross(n_hat, basis);
+    if norm(v) < 1e-8
+        basis = zeros(1,3);
+        basis(mod(idx,3)+1) = 1;
+        v = cross(n_hat, basis);
+    end
+end
+
+function verts = wall_vertices(frame)
+% Compute the 8 vertices of a rectangular wall prism in world coordinates
+    locals = [ -frame.half_w, -frame.half_h, -frame.half_t;
+                frame.half_w, -frame.half_h, -frame.half_t;
+                frame.half_w,  frame.half_h, -frame.half_t;
+               -frame.half_w,  frame.half_h, -frame.half_t;
+               -frame.half_w, -frame.half_h,  frame.half_t;
+                frame.half_w, -frame.half_h,  frame.half_t;
+                frame.half_w,  frame.half_h,  frame.half_t;
+               -frame.half_w,  frame.half_h,  frame.half_t];
+    verts = zeros(8,3);
+    for ii = 1:8
+        verts(ii,:) = frame.center + locals(ii,1)*frame.u + locals(ii,2)*frame.v + locals(ii,3)*frame.normal;
     end
 end
