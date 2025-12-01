@@ -239,10 +239,6 @@ def animate_flight_paths(speed_up=1.0, data=None):
     )
 
 
-# =====================================================================
-# Helper functions (Python equivalents of MATLAB subfunctions)
-# =====================================================================
-
 def _draw_obstacles(ax, obstacles, style):
     col = style.get("color", "b")
     alp = style.get("alpha", 0.35)

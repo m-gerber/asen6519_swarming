@@ -1,0 +1,11 @@
+{
+  "command_id": 2,
+  "command_type": "update_goal",
+  "new_goal_m": [
+    200.0,
+    0.0,
+    50.0
+  ],
+  "reason": "Redirecting swarm away from hazard centered at [100.0, 100.0, 0.0] with radius 100.0 m.",
+  "timestamp": "2025-12-01T20:34:46.170801Z"
+}

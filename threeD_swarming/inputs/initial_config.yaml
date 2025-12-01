@@ -1,0 +1,35 @@
+n: 5
+Ls_m: 3.0
+
+goal_m: [200.0, 200.0, 50.0]
+
+initial_positions_m:
+  - [ 4.0,   0.0, 20.0 ]
+  - [-4.0,   0.0, 20.0 ]
+  - [ 8.0,   0.0, 20.0 ]
+  - [-8.0,   0.0, 20.0 ]
+  - [12.0,   0.0, 20.0 ]
+
+initial_velocities_mps:
+  - [4.0, 0.0, 0.0]
+  - [4.0, 0.0, 0.0]
+  - [4.0, 0.0, 0.0]
+  - [4.0, 0.0, 0.0]
+  - [4.0, 0.0, 0.0]
+
+T_s: 30.0
+dt_s: 0.1
+
+run_w_obstacles: true
+
+log_every_n_steps: 5
+command_file_path: "commands/command.json"
+command_check_every_n_steps: 10
+
+hazards:
+  - name: "test_fire"
+    type: "sphere"
+    center_m: [100.0, 100.0, 0.0]
+    radius_m: 40.0
+
+reroute_goal_m: [200.0, 0.0, 50.0]

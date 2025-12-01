@@ -1,0 +1,17 @@
+{
+  "command_id": 3,
+  "command_type": "rejoin_swarm",
+  "drone_ids": [
+    0,
+    1
+  ],
+  "target_group_id": "main",
+  "reason": "Fire investigation complete. Rejoining main swarm for transit to Boulder.",
+  "timestamp": "2025-12-01T22:26:56.555519Z",
+  "source": "fire_patrol_scenario",
+  "rendezvous_point": [
+    3000.0,
+    0.0,
+    100.0
+  ]
+}

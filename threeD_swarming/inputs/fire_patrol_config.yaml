@@ -1,0 +1,98 @@
+# Fire Patrol Mission Configuration: Golden to Boulder, Colorado
+# Mission: Five drones fly north from Golden to Boulder on fire patrol
+# Mid-flight: Two drones break off to investigate reported fire
+
+# Number of drones
+n: 5
+
+# Desired separation distance between drones [m]
+Ls_m: 8.0
+
+# Final destination: Boulder, CO (simplified coordinates in meters from start)
+# For demo speed we shorten the path to ~4 km
+goal_m: [4000.0, 0.0, 100.0]
+
+# Initial positions: Formation at Golden takeoff point
+# Drones start in a V-formation heading north
+initial_positions_m:
+  - [0.0, 0.0, 100.0]      # Drone 0 - Leader position
+  - [-10.0, -8.0, 100.0]   # Drone 1 - Left wing
+  - [10.0, -8.0, 100.0]    # Drone 2 - Right wing
+  - [-20.0, -16.0, 100.0]  # Drone 3 - Left rear
+  - [20.0, -16.0, 100.0]   # Drone 4 - Right rear
+
+# Initial velocities: All drones flying north (positive x direction) at 15 m/s
+initial_velocities_mps:
+  - [15.0, 0.0, 0.0]
+  - [15.0, 0.0, 0.0]
+  - [15.0, 0.0, 0.0]
+  - [15.0, 0.0, 0.0]
+  - [15.0, 0.0, 0.0]
+
+# Maximum simulation time [s]
+# At 15 m/s, 4 km takes ~267 seconds, add margin for maneuvers
+T_s: 600.0
+
+# Time step [s]
+dt_s: 0.1
+
+# Enable obstacle avoidance
+run_w_obstacles: true
+
+# Logging frequency (downsample tracking logs)
+log_every_n_steps: 10
+
+# Command file path for LLM-generated commands
+command_file_path: "commands/fire_patrol_command.json"
+
+# Command check frequency (every N simulation steps)
+# Check every 50 steps = every 5 seconds at dt=0.1
+command_check_every_n_steps: 50
+
+# Fire location coordinates [m] - reported fire location
+# Located west (negative y) of the halfway point so drones must break formation
+fire_location_m: [2000.0, -900.0, 80.0]
+
+# Obstacle near fire location to test avoidance during investigation
+# This represents a tall radio tower positioned between the route and fire site
+fire_area_obstacle:
+  type: "cylinder"
+  xy: [1950.0, -450.0]
+  radius: 120.0
+  zmin: 0.0
+  zmax: 180.0
+  k_o: 60.0        # Stronger repulsion so drones visibly route around structure
+  d_safe: 220.0    # Influence extends far enough to force westward detour
+
+# Hazards configuration (not currently used for command triggers in this scenario)
+# Kept for compatibility with supervisor.py if needed
+hazards:
+  - name: "reported_fire_zone"
+    type: "sphere"
+    center_m: [2000.0, -900.0, 0.0]
+    radius_m: 250.0
+
+# Alternative reroute goal (not used in this scenario)
+reroute_goal_m: [4000.0, -200.0, 100.0]
+
+# Mission timing parameters (used by fire_patrol_demo.py)
+mission_params:
+  # Time at which to trigger fire investigation command [s]
+  # Halfway point: 2 km at 15 m/s ≈ 133 seconds
+  fire_alert_time_s: 133.0
+  
+  # Duration for investigation drones to loiter at fire location [s]
+  investigation_loiter_duration_s: 3.0
+  
+  # Drones to break off for investigation
+  investigation_drone_ids: [0, 1]
+  
+  # Rendezvous point for rejoining after investigation
+  # Positioned ahead on the main flight path
+  rejoin_rendezvous_m: [3000.0, 0.0, 100.0]
+  
+  # Estimated travel time for investigation team to reach fire (for scheduling commands)
+  travel_time_to_fire_s: 70.0
+  
+  # Buffer after loiter before issuing rejoin command
+  rejoin_buffer_s: 12.0
