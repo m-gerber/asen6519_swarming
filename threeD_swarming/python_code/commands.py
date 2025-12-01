@@ -180,7 +180,7 @@ def apply_command_to_sim(
 
         # Update main group goal
         if swarm_manager is not None and "main" in swarm_manager.groups:
-            swarm_manager.groups["main"].goal = new_goal.copy()
+            swarm_manager.set_group_goal("main", new_goal.copy())
         
         return new_goal, params, obstacles
     
@@ -308,7 +308,7 @@ def apply_command_to_sim(
             return goal, params, obstacles
         
         if group_id in swarm_manager.groups:
-            swarm_manager.groups[group_id].goal = new_goal.copy()
+            swarm_manager.set_group_goal(group_id, new_goal.copy())
             print(f"Updated goal for group '{group_id}' to {new_goal}")
             
             # If it's main group, also update the main goal

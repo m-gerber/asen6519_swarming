@@ -15,6 +15,7 @@ class DroneMode(Enum):
     NAVIGATE = "navigate"        # Independent waypoint navigation
     LOITER = "loiter"           # Hover at current/specified position
     REJOIN = "rejoin"           # Transitioning back to swarm
+    LANDED = "landed"           # Holding position at goal / landed state
 
 
 @dataclass
@@ -47,6 +48,8 @@ class DroneGroup:
     drone_ids: List[int]
     goal: np.ndarray = field(default_factory=lambda: np.zeros(3))
     Ls: float = 15.0  # Desired separation distance
+    hold_at_goal: bool = False     # Whether this group should stay put once goal reached
+    goal_hold_active: bool = False # True once hold_at_goal condition is triggered
     
     def get_positions(self, drones: Dict[int, Drone]) -> np.ndarray:
         """Get positions of all drones in this group."""
@@ -106,7 +109,8 @@ class SwarmManager:
             group_id="main",
             drone_ids=list(range(n_drones)),
             goal=goal.copy(),
-            Ls=Ls
+            Ls=Ls,
+            hold_at_goal=True,
         )
     
     def split_drones(self, drone_ids: List[int], new_group_id: str, 
@@ -148,7 +152,8 @@ class SwarmManager:
             group_id=new_group_id,
             drone_ids=drone_ids,
             goal=new_goal.copy(),
-            Ls=Ls
+            Ls=Ls,
+            hold_at_goal=False,
         )
     
     def assign_waypoints(self, drone_id: int, waypoints: List[np.ndarray], 
@@ -217,6 +222,7 @@ class SwarmManager:
             raise ValueError(f"Target group '{target_group_id}' not found")
         
         target_group = self.groups[target_group_id]
+        rendezvous_override = target_group.goal.copy() if target_group.goal_hold_active else None
         
         for drone_id in drone_ids:
             if drone_id not in self.drones:
@@ -225,9 +231,12 @@ class SwarmManager:
             drone = self.drones[drone_id]
             drone.mode = DroneMode.REJOIN
             drone.rejoin_target_group = target_group_id
-            drone.rejoin_rendezvous = (rendezvous_point.copy() 
-                                       if rendezvous_point is not None 
-                                       else target_group.goal.copy())
+            if rendezvous_override is not None:
+                drone.rejoin_rendezvous = rendezvous_override.copy()
+            elif rendezvous_point is not None:
+                drone.rejoin_rendezvous = rendezvous_point.copy()
+            else:
+                drone.rejoin_rendezvous = target_group.goal.copy()
             drone.rejoin_blend_factor = 0.0
             # Navigate toward rendezvous using waypoint guidance
             drone.waypoints = [drone.rejoin_rendezvous.copy()]
@@ -262,12 +271,22 @@ class SwarmManager:
         drone.rejoin_rendezvous = None
         drone.rejoin_blend_factor = 0.0
         
-        if target_group_id in self.groups and drone_id not in self.groups[target_group_id].drone_ids:
-            self.groups[target_group_id].drone_ids.append(drone_id)
+        if target_group_id in self.groups:
+            group = self.groups[target_group_id]
+            if drone_id not in group.drone_ids:
+                group.drone_ids.append(drone_id)
+            if group.goal_hold_active:
+                # Immediately land with the rest of the group
+                drone.mode = DroneMode.LANDED
+                drone.loiter_position = group.goal.copy()
+                drone.loiter_start_time = None
+                drone.loiter_duration = 0.0
     
     def update_loiter_state(self, current_time: float):
         """Check loiter timers and transition drones back to navigation."""
         for drone in self.drones.values():
+            if drone.mode == DroneMode.LANDED:
+                continue
             if drone.mode == DroneMode.LOITER and drone.loiter_start_time is not None:
                 elapsed = current_time - drone.loiter_start_time
                 if elapsed >= drone.loiter_duration:
@@ -321,3 +340,70 @@ class SwarmManager:
             if i in self.drones:
                 self.drones[i].position = P[i].copy()
                 self.drones[i].velocity = V[i].copy()
+
+    # ------------------------------------------------------------------
+    # Group goal hold helpers
+    # ------------------------------------------------------------------
+
+    def set_group_goal(self, group_id: str, new_goal: np.ndarray):
+        """Update a group's goal and release any goal-hold state."""
+        group = self.groups.get(group_id)
+        if group is None:
+            return
+        group.goal = new_goal.copy()
+        self.release_group_hold(group_id)
+
+    def release_group_hold(self, group_id: str):
+        """Allow a previously landed group to resume swarm behavior."""
+        group = self.groups.get(group_id)
+        if group is None:
+            return
+        if not group.goal_hold_active:
+            return
+        group.goal_hold_active = False
+        for drone_id in group.drone_ids:
+            drone = self.drones.get(drone_id)
+            if drone is None:
+                continue
+            if drone.mode == DroneMode.LANDED:
+                drone.mode = DroneMode.SWARM
+                drone.loiter_position = None
+                drone.loiter_start_time = None
+                drone.loiter_duration = 0.0
+
+    def _activate_group_goal_hold(self, group_id: str):
+        group = self.groups.get(group_id)
+        if group is None:
+            return
+        group.goal_hold_active = True
+        for drone_id in group.drone_ids:
+            drone = self.drones.get(drone_id)
+            if drone is None:
+                continue
+            drone.mode = DroneMode.LANDED
+            drone.waypoints = []
+            drone.current_waypoint_idx = 0
+            drone.loiter_position = group.goal.copy()
+            drone.loiter_start_time = None
+            drone.loiter_duration = 0.0
+
+    def check_group_goal_completion(self, tolerance: float):
+        """Lock groups that are configured to hold once every member is at the goal."""
+        for group_id, group in self.groups.items():
+            if not group.hold_at_goal or group.goal_hold_active:
+                continue
+            if not group.drone_ids:
+                continue
+
+            all_within_tol = True
+            for drone_id in group.drone_ids:
+                drone = self.drones.get(drone_id)
+                if drone is None:
+                    continue
+                dist = np.linalg.norm(drone.position - group.goal)
+                if dist > tolerance:
+                    all_within_tol = False
+                    break
+
+            if all_within_tol:
+                self._activate_group_goal_hold(group_id)

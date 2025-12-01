@@ -137,6 +137,10 @@ def compute_swarm_derivs(
                 blend = drone.rejoin_blend_factor
                 a[i] = (1.0 - blend) * a_independent + blend * a_swarm
 
+            elif drone.mode == DroneMode.LANDED:
+                # Treat landed drones like indefinite loiter/position hold
+                a[i] = compute_loiter_accel(drone, params)
+
     dp = v
     dv = a
     return dp, dv
@@ -216,6 +220,9 @@ def compute_group_swarm_accel(
     if group is None:
         # Fallback to independent control
         return np.zeros(3)
+    if group.goal_hold_active:
+        # Group has reached its destination; keep everyone planted
+        return compute_loiter_accel(drone, params)
     
     # Get group members
     group_drone_ids = [did for did in group.drone_ids if did in swarm_manager.drones]
@@ -401,6 +408,8 @@ def step_swarm(
     state.P = p_next
     state.V = v_next
     state.t += dt
+    if swarm_manager is not None:
+        swarm_manager.set_state_arrays(state.P, state.V)
     return state
 
 
@@ -665,6 +674,9 @@ def demo_swarm_run(
             params=params,
             swarm_manager=swarm_manager,
         )
+
+        if swarm_manager is not None:
+            swarm_manager.check_group_goal_completion(params.goal_tol)
 
         # ------------------------------------------------
         # Inject scripted commands tied to simulation time
