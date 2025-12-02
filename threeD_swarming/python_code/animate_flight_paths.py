@@ -7,6 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from matplotlib.animation import FFMpegWriter, FuncAnimation
+from matplotlib.ticker import MaxNLocator, ScalarFormatter
 
 
 def animate_flight_paths(speed_up=1.0, data=None):
@@ -134,13 +135,14 @@ def animate_flight_paths(speed_up=1.0, data=None):
     xrange = _expand_range(xrange, margin)
     yrange = _expand_range(yrange, margin)
     zrange = _expand_range(zrange, margin)
+    zrange[1] = max(zrange[1], 300.0)
 
     # ------------------------------------------------------------
     # Figure setup
     # ------------------------------------------------------------
     colors = plt.cm.tab10(np.linspace(0, 1, max(n, 10)))[:n]  # similar to lines(n)
 
-    fig = plt.figure("Swarm Animation", figsize=(8, 6))
+    fig = plt.figure("Swarm Animation", figsize=(10, 6))
     fig.patch.set_facecolor("white")
     ax = fig.add_subplot(111, projection="3d")
     ax.grid(True)
@@ -159,6 +161,8 @@ def animate_flight_paths(speed_up=1.0, data=None):
     ax.set_ylim(yrange)
     ax.set_zlim(zrange)
     ax.set_title("Swarm trajectories")
+    # Make tick labels readable
+    _format_3d_axes(ax)
 
     # Floor (simple plane at z_min)
     Xplane, Yplane = np.meshgrid(
@@ -421,6 +425,30 @@ def _expand_range(rng_in, margin):
         )
 
 
+def _format_3d_axes(ax):
+    """
+    Make 3D axes ticks more readable:
+    - fewer tick marks
+    - smaller labels
+    - use offset/scientific notation when numbers are large
+    """
+    for axis in (ax.xaxis, ax.yaxis, ax.zaxis):
+        axis.set_major_locator(MaxNLocator(nbins=4))
+
+        fmt = ScalarFormatter(useOffset=True, useMathText=True)
+        fmt.set_powerlimits((-2, 3))
+        axis.set_major_formatter(fmt)
+
+    ax.tick_params(axis="x", which="major", labelsize=8, pad=1)
+    ax.tick_params(axis="y", which="major", labelsize=8, pad=1)
+    ax.tick_params(axis="z", which="major", labelsize=8, pad=1)
+
+    ax.xaxis.label.set_size(10)
+    ax.yaxis.label.set_size(10)
+    ax.zaxis.label.set_size(10)
+    ax.zaxis.labelpad = 5
+
+
 def _wall_geometry(obs):
     """
     Derive orthonormal frame and dimensions for a rectangular wall obstacle.
@@ -640,6 +668,7 @@ def animate_flight_paths_interactive(speed_up=1.0, data=None, repeat=True):
     xrange = _expand_range(xrange, margin)
     yrange = _expand_range(yrange, margin)
     zrange = _expand_range(zrange, margin)
+    zrange[1] = max(zrange[1], 500.0)
 
     # ------------------------------------------------------------
     # Figure setup
@@ -665,6 +694,8 @@ def animate_flight_paths_interactive(speed_up=1.0, data=None, repeat=True):
     ax.set_ylim(yrange)
     ax.set_zlim(zrange)
     ax.set_title("Swarm trajectories (Interactive - Click & Drag to Rotate)")
+    # Make tick labels readable
+    _format_3d_axes(ax)
 
     # Floor
     Xplane, Yplane = np.meshgrid(

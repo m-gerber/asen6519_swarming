@@ -1,0 +1,4 @@
+# Run the demo from the script directory
+Push-Location "C:\Users\bryan\OneDrive\Desktop\asen6519_swarming\threeD_swarming\python_code";
+C:/Users/bryan/AppData/Local/Programs/Python/Python313/python.exe fire_patrol_demo.py;
+Pop-Location
