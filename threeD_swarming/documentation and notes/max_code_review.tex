@@ -1,0 +1,144 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath, amssymb, geometry, graphicx, booktabs}
+\geometry{margin=1in}
+
+\title{Methods: 2D Leader--Follower Swarming with Interactive Parameter Control}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{Overview}
+This document describes a two-dimensional swarming method in which a group of simple agents (``drones'') follow a virtual leader while maintaining flocking behavior. The scheme is based on discrete-time point-mass dynamics with cohesion, alignment, and separation interactions, together with a leader-following term. Swarm behavior can be tuned interactively through a small set of scalar weights, which may be adjusted in real time via an external parameter file.
+
+The formulation is intended as a lightweight, visually intuitive swarming model suitable for demonstration, education, and rapid experimentation with flocking behavior and human-in-the-loop control.
+
+\section{Agent Dynamics}
+We consider $N$ agents moving in a plane. The position and velocity of agent $i$ at discrete time index $k$ are denoted by
+\begin{equation}
+\mathbf{x}_i^k \in \mathbb{R}^2, \qquad \mathbf{v}_i^k \in \mathbb{R}^2, \qquad i = 1,\dots,N.
+\end{equation}
+The simulation advances with a fixed time step $\Delta t > 0$. The update equations are
+\begin{align}
+\mathbf{a}_i^k &= \mathbf{a}_i^{\mathrm{coh},k} + \mathbf{a}_i^{\mathrm{ali},k} + \mathbf{a}_i^{\mathrm{sep},k} + \mathbf{a}_i^{\mathrm{lead},k}, [4pt]
+\mathbf{v}_i^{k+1} &= \lambda_v \bigl(\mathbf{v}_i^k + \Delta t, \mathbf{a}_i^k\bigr), [4pt]
+\mathbf{x}_i^{k+1} &= \mathbf{x}_i^k + \Delta t, \mathbf{v}_i^{k+1},
+\end{align}
+where $\lambda_v \in (0,1)$ is a velocity damping factor and $\mathbf{a}_i^k$ is the net acceleration-like control input constructed from the terms defined below.
+
+Each agent has identical (unit) mass, so physical mass does not appear explicitly. Orientation dynamics and actuator limits are not modeled; the control terms should be interpreted as abstract steering influences.
+
+\section{Neighborhood and Proximity Definitions}
+At time $k$, the vector from agent $i$ to agent $j$ is
+\begin{equation}
+\mathbf{r}*{ij}^k = \mathbf{x}*j^k - \mathbf{x}*i^k, \qquad d*{ij}^k = |\mathbf{r}*{ij}^k|*2.
+\end{equation}
+The neighborhood of agent $i$ is defined by a sensing radius $R*\mathrm{n} > 0$ as
+\begin{equation}
+\mathcal{N}*i^k = { j \ne i : d*{ij}^k < R*\mathrm{n} }.
+\end{equation}
+A separate minimum-distance threshold $d_\mathrm{min} > 0$ is used to define agents that are too close and should trigger separation behavior:
+\begin{equation}
+\mathcal{S}*i^k = { j \ne i : d*{ij}^k < d_\mathrm{min} }.
+\end{equation}
+
+\section{Interaction Terms}
+The interaction structure follows the classical ``boids'' decomposition into cohesion, alignment, and separation, plus an additional leader-following term.
+
+\subsection{Cohesion}
+The cohesion term drives each agent toward the centroid of its neighbors. If $\mathcal{N}_i^k$ is nonempty, the neighbor centroid is
+\begin{equation}
+\bar{\mathbf{x}}_i^k = \frac{1}{|\mathcal{N}*i^k|} \sum*{j \in \mathcal{N}_i^k} \mathbf{x}_j^k.
+\end{equation}
+The cohesion acceleration is then
+\begin{equation}
+\mathbf{a}*i^{\mathrm{coh},k} = w*\mathrm{coh} \bigl( \bar{\mathbf{x}}_i^k - \mathbf{x}*i^k \bigr),
+\end{equation}
+where $w*\mathrm{coh} > 0$ is the cohesion weight. If $\mathcal{N}_i^k$ is empty, $\mathbf{a}_i^{\mathrm{coh},k} = \mathbf{0}$.
+
+\subsection{Alignment}
+Alignment steers the velocity of each agent toward the average velocity of its neighbors. The neighbor-mean velocity is
+\begin{equation}
+\bar{\mathbf{v}}_i^k = \frac{1}{|\mathcal{N}*i^k|} \sum*{j \in \mathcal{N}_i^k} \mathbf{v}_j^k,
+\end{equation}
+and the alignment term is
+\begin{equation}
+\mathbf{a}*i^{\mathrm{ali},k} = w*\mathrm{ali} \bigl( \bar{\mathbf{v}}_i^k - \mathbf{v}*i^k \bigr),
+\end{equation}
+with $w*\mathrm{ali} > 0$ an alignment weight. Again, if $\mathcal{N}_i^k$ is empty, this term is taken as zero.
+
+\subsection{Separation}
+Separation provides a short-range repulsion to avoid clustering and overlaps. For agents within the minimum-distance threshold, we use an inverse-square repulsion:
+\begin{equation}
+\mathbf{a}*i^{\mathrm{sep},k} = w*\mathrm{sep} \sum_{j \in \mathcal{S}*i^k} -\frac{\mathbf{r}*{ij}^k}{\bigl(d_{ij}^k\bigr)^2 + \varepsilon},
+\end{equation}
+where $w_\mathrm{sep} > 0$ is the separation weight and $\varepsilon \ll 1$ is a small regularization term (omitted in code when distances are strictly positive). This contribution pushes agents away more strongly as they come very close.
+
+\section{Virtual Leader Model}
+The swarm tracks a single virtual leader whose position and velocity at time $k$ are denoted by $\mathbf{x}*\ell^k$ and $\mathbf{v}*\ell^k$. The leader is not constrained by the same interaction rules and instead follows a prescribed trajectory.
+
+\subsection{Leader Dynamics}
+Two types of leader motion are used:
+\begin{enumerate}
+\item \textbf{Straight-line leader with boundary reflection}: the leader moves at constant velocity until it reaches a predefined $x$-boundary, then reverses its horizontal velocity component.
+\item \textbf{Waypoint-following leader}: the leader is assigned a sequence of planar waypoints ${\mathbf{w}*m}*{m=1}^M$. At each time step the leader steers toward its current waypoint at a fixed speed $v_\ell$, switching to the next waypoint when it comes within a small tolerance of the current target. Once the final waypoint is reached, the leader holds position.
+\end{enumerate}
+In both cases, the leader update is of the form
+\begin{equation}
+\mathbf{x}*\ell^{k+1} = \mathbf{x}*\ell^k + \Delta t, \mathbf{v}*\ell^k, \qquad \mathbf{v}*\ell^{k+1} = \mathcal{U}*\ell(\mathbf{x}*\ell^k, \mathbf{v}*\ell^k, k),
+\end{equation}
+where $\mathcal{U}*\ell$ encodes the chosen leader policy (straight-line with reflections or waypoint pursuit).
+
+\subsection{Leader-Following Term}
+Agents are encouraged to trail behind the leader at a fixed offset distance along the leader's direction of motion. Let the leader's direction at time $k$ be
+\begin{equation}
+\hat{\mathbf{d}}*\ell^k =
+\begin{cases}
+\dfrac{\mathbf{v}*\ell^k}{|\mathbf{v}*\ell^k|*2}, & |\mathbf{v}*\ell^k|*2 > 0, [8pt]
+\hat{\mathbf{d}}*\ell^{k-1}, & \text{otherwise},
+\end{cases}
+\end{equation}
+with a default direction chosen for the initial step. A desired trailing point is then
+\begin{equation}
+\mathbf{x}*\mathrm{trail}^k = \mathbf{x}*\ell^k - d*\mathrm{trail}, \hat{\mathbf{d}}*\ell^k,
+\end{equation}
+where $d*\mathrm{trail} > 0$ is a tunable distance behind the leader. The leader-following acceleration for agent $i$ is
+\begin{equation}
+\mathbf{a}*i^{\mathrm{lead},k} = w*\mathrm{lead} \bigl( \mathbf{x}_\mathrm{trail}^k - \mathbf{x}*i^k \bigr),
+\end{equation}
+with $w*\mathrm{lead} > 0$ the leader-follow weight.
+
+\section{Interactive Parameter Control}
+The swarm behavior is controlled by a small set of scalar weights
+\begin{equation}
+w_\mathrm{ali}, \quad w_\mathrm{coh}, \quad w_\mathrm{sep}, \quad w_\mathrm{lead},
+\end{equation}
+along with neighborhood and time-step parameters $(R_\mathrm{n}, d_\mathrm{min}, \lambda_v, \Delta t)$. In the implementation, the core weights are exposed as interactive sliders in the visualization, and are also stored in an external JSON configuration file. This allows a user or auxiliary script to:
+\begin{itemize}
+\item adjust the flocking style (e.g., `tight,'' `dispersed,'' or ``chaotic'') by mapping named modes to predefined weight sets;
+\item append or clear leader waypoints during runtime, thereby steering the leader (and hence the swarm) along user-defined paths;
+\item observe the real-time response of the swarm to changes in cohesion, alignment, and separation strengths.
+\end{itemize}
+Because the agent update loop reads the JSON file at each frame, changes to the parameters or waypoints are reflected immediately in the simulated motion.
+
+\section{Initialization}
+At the beginning of the simulation, the leader position and velocity are initialized to
+\begin{equation}
+\mathbf{x}*\ell^0 = \begin{bmatrix} x*{\ell,0} \ y_{\ell,0} \end{bmatrix}, \qquad
+\mathbf{v}*\ell^0 = \begin{bmatrix} v*{\ell,0} \ 0 \end{bmatrix},
+\end{equation}
+with user-specified values. The agents are initialized in a narrow band behind the leader:
+\begin{equation}
+\mathbf{x}*i^0 \approx \mathbf{x}*\ell^0 - d_\mathrm{trail},\hat{\mathbf{d}}_\ell^0 + \delta \mathbf{x}_i, \qquad \mathbf{v}_i^0 = \mathbf{0},
+\end{equation}
+where $\delta \mathbf{x}_i$ are small random perturbations that introduce diversity in the initial formation.
+
+\section{Limitations}
+The present model is intentionally simple. It omits aerodynamic forces, actuator dynamics, collision detection, and constraints such as maximum speed or acceleration. The interactions are purely kinematic, and the leader is treated as an externally controlled point. Nevertheless, the method captures many characteristic features of flocking behavior and provides an accessible platform for exploring the effects of interaction rules and human-in-the-loop steering on collective motion.
+
+\section{Summary}
+This methods description formalizes a 2D leader--follower swarm model with cohesion, alignment, separation, and leader-following terms, advanced in discrete time with simple damping. Interactive adjustment of a small set of weights and waypoints enables rapid exploration of qualitative swarm behaviors while keeping the underlying dynamics mathematically transparent.
+
+\end{document}

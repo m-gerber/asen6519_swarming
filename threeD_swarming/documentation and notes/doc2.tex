@@ -1,0 +1,136 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath, amssymb, geometry, graphicx, booktabs}
+\geometry{margin=1in}
+
+\title{Methods: Dynamical Model and Control Laws for a 3D Drone Swarm Simulation}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{Overview}
+This section describes the mathematical formulation, physical modeling assumptions, and control laws used to simulate a three-dimensional coordinated drone swarm. The method couples Newtonian point-mass dynamics with biologically inspired flocking laws and additional mission-oriented control terms. Obstacle avoidance, multi-group coordination, and individual drone behaviors (e.g., loiter, waypoint navigation, rejoining) are included through a unified acceleration-based framework.
+
+The objective is to provide a reproducible, physics-grounded formulation appropriate for use in journal articles and technical documentation.
+
+\section{Physical Model}
+Each drone is modeled as a point mass governed by second-order dynamics. Let $\mathbf{p}_i(t) \in \mathbb{R}^3$ and $\mathbf{v}_i(t) \in \mathbb{R}^3$ denote the position and velocity of drone $i$, and $\mathbf{a}_i(t)$ its acceleration. The governing equations are:
+\begin{align}
+\dot{\mathbf{p}}_i &= \mathbf{v}_i,\\
+\dot{\mathbf{v}}_i &= \mathbf{a}_i.
+\end{align}
+The acceleration $\mathbf{a}_i$ is assembled from several terms representing goal attraction, separation, alignment, altitude tracking, obstacle avoidance, damping, and mode-specific behaviors.
+
+All drones share identical mass, which is absorbed into the control gains. Orientation dynamics, aerodynamic forces, and actuator bandwidth limitations are not explicitly modeled; the simulated accelerations represent the ideal control commands.
+
+\subsection{Assumptions}
+The primary simplifying assumptions are:
+\begin{itemize}
+\item \textbf{Point-mass kinematics}: Drones have no attitude dynamics; only translational motion is simulated.
+\item \textbf{Instantaneous control response}: Accelerations can be commanded directly, subject to a maximum magnitude $a_{\max}$.
+\item \textbf{All-to-all sensing within groups}: Separation and alignment terms assume each drone can sense the state of all drones in its assigned group.
+\item \textbf{Static obstacles}: Obstacles such as cylinders and walls do not move over time.
+\end{itemize}
+
+\section{Control Architecture}
+The overall acceleration applied to drone $i$ is:
+\begin{equation}
+\mathbf{a}_i = \mathbf{a}_i^{\mathrm{goal}} + \mathbf{a}_i^{\mathrm{align}} + \mathbf{a}_i^{\mathrm{sep}} + \mathbf{a}_i^{\mathrm{alt}} + \mathbf{a}_i^{\mathrm{obs}} - c_d \mathbf{v}_i,
+\end{equation}
+where $c_d$ is a linear damping coefficient. Additional modifications apply depending on drone mode (navigate, loiter, rejoin, landed).
+
+\subsection{Goal Attraction}
+Each drone is driven toward its group goal position $\mathbf{g}$ through a proportional control law:
+\begin{equation}
+\mathbf{a}_i^{\mathrm{goal}} = k_g (\mathbf{g} - \mathbf{p}_i),
+\end{equation}
+where $k_g$ is a gain parameter. For independent navigation, a higher gain $2k_g$ is used to accelerate waypoint convergence.
+
+\subsection{Velocity Alignment}
+To promote coherent group motion, drones align their velocities toward the group mean:
+\begin{equation}
+\mathbf{a}_i^{\mathrm{align}} = k_a (\bar{\mathbf{v}} - \mathbf{v}_i),
+\end{equation}
+where $k_a$ is the alignment gain and $\bar{\mathbf{v}}$ is the average velocity of drones in the same group.
+
+\subsection{Separation-Length Regulation}
+To maintain a desired inter-drone spacing $L_s$, we include a pairwise spacing term:
+\begin{equation}
+\mathbf{a}*i^{\mathrm{sep}} = \frac{k_s}{N_g - 1} \sum*{j \in g, j \neq i} (d_{ij} - L_s) \hat{\mathbf{r}}*{ij},
+\end{equation}
+where $N_g$ is the number of drones in group $g$, $d*{ij} = |\mathbf{p}_j - \mathbf{p}*i|$, and $\hat{\mathbf{r}}*{ij} = (\mathbf{p}_j - \mathbf{p}*i)/d*{ij}$. This encourages expansion when drones are too close and contraction when they are too far apart.
+
+\subsection{Altitude Tracking}
+A soft altitude regulation term is included:
+\begin{equation}
+\mathbf{a}*i^{\mathrm{alt}} = k_h (h^* - p*{i,z}) \mathbf{e}_z,
+\end{equation}
+with $h^*$ the target altitude and $\mathbf{e}_z$ the vertical unit vector.
+
+\section{Obstacle Repulsion Model}
+Obstacles exert repulsive forces when a drone approaches within a safety distance $d_\mathrm{safe}$. The general form is:
+\begin{equation}
+\mathbf{a}*i^{\mathrm{obs}} = f(d_i), \hat{\mathbf{n}}*i,
+\end{equation}
+where $d_i$ is the distance from the drone to the obstacle's surface, $\hat{\mathbf{n}}*i$ is the outward surface normal, and the scalar repulsion follows
+\begin{equation}
+f(d) = k_o \left(\frac{1}{d} - \frac{1}{d*\mathrm{safe}}\right), \qquad f = 0\ \text{ if } d \ge d*\mathrm{safe},
+\end{equation}
+with the magnitude capped at $f*{\max}$.
+
+\subsection{Cylindrical Obstacles}
+A cylinder is defined by center $(c_x,c_y)$, radius $R$, and vertical bounds $z_0, z_1$. For each drone, we compute the closest point on either the lateral surface or the top/bottom caps. The repulsion uses the nearer of the two.
+
+\subsection{Planar Walls}
+Walls are rectangular panels defined by a center point, two in-plane unit vectors $(\mathbf{u}, \mathbf{v})$, a normal vector $\mathbf{n}$, and half-widths $(w,h,t)$. The closest point is found by projecting the drone into the local wall frame and clamping the coordinates to the panel extents.
+
+\section{Mode-Specific Control Laws}
+\subsection{Waypoint Navigation}
+For independent flight, drone $i$ navigates to waypoint $\mathbf{w}$ using
+\begin{equation}
+\mathbf{a}_i = 2k_g (\mathbf{w} - \mathbf{p}_i) - 1.5 c_d \mathbf{v}_i + \mathbf{a}_i^{\mathrm{obs}}.
+\end{equation}
+
+\subsection{Loiter Behavior}
+Loitering holds the drone at a fixed position $\mathbf{p}*\ell$:
+\begin{equation}
+\mathbf{a}*i = k*{\ell}(\mathbf{p}*\ell - \mathbf{p}_i) - 3c_d\mathbf{v}*i,
+\end{equation}
+with $k*{\ell}$ a strong hovering gain.
+
+\subsection{Rejoining Behavior}
+Rejoining blends independent navigation and swarm behavior:
+\begin{equation}
+\mathbf{a}_i = (1-\beta_i), \mathbf{a}_i^{\mathrm{nav}} + \beta_i, \mathbf{a}_i^{\mathrm{swarm}},
+\end{equation}
+where $0 \le \beta_i \le 1$ increases over time until the drone fully reintegrates.
+
+\section{Acceleration Saturation}
+To maintain physical plausibility, accelerations satisfy
+\begin{equation}
+|\mathbf{a}*i| \le a*{\max},
+\end{equation}
+with vector clipping applied when necessary.
+
+\section{Time Integration}
+The dynamics are integrated using the classical fourth-order Runge--Kutta (RK4) scheme with constant timestep $\Delta t$:
+\begin{align}
+\mathbf{k}_1 &= f(\mathbf{p}, \mathbf{v}), \
+\mathbf{k}_2 &= f\left(\mathbf{p} + \tfrac{1}{2}\Delta t, \mathbf{k}_1,, \mathbf{v} + \tfrac{1}{2}\Delta t, \mathbf{k}_1\right), \
+\mathbf{k}_3 &= f\left(\mathbf{p} + \tfrac{1}{2}\Delta t, \mathbf{k}_2,, \mathbf{v} + \tfrac{1}{2}\Delta t, \mathbf{k}_2\right), \
+\mathbf{k}_4 &= f\left(\mathbf{p} + \Delta t, \mathbf{k}_3,, \mathbf{v} + \Delta t, \mathbf{k}_3\right),
+\end{align}
+with updates
+\begin{equation}
+\mathbf{p}(t+\Delta t) = \mathbf{p}(t) + \frac{\Delta t}{6}(\mathbf{k}_1 + 2\mathbf{k}_2 + 2\mathbf{k}_3 + \mathbf{k}_4),
+\end{equation}
+\begin{equation}
+\mathbf{v}(t+\Delta t) = \mathbf{v}(t) + \frac{\Delta t}{6}(\mathbf{k}_1 + 2\mathbf{k}_2 + 2\mathbf{k}_3 + \mathbf{k}_4).
+\end{equation}
+
+\section{Summary}
+This methods section provides a unified framework for simulating multi-agent aerial swarms using physically motivated second-order dynamics and structured control laws. The formulation supports multi-group coordination, obstacle avoidance, and mission-level behaviors while remaining computationally efficient and mathematically transparent.
+
+\end{document}

@@ -1,0 +1,33 @@
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (MiKTeX 24.4) (preloaded format=pdflatex 2025.2.15)  8 DEC 2025 07:34
+entering extended mode
+ restricted \write18 enabled.
+ file:line:error style messages enabled.
+ %&-line parsing enabled.
+**"c:/Users/bryan/OneDrive/CU/Code/asen6519_swarming/threeD_swarming/documentation and notes/swarm_control_1_draft.tex"
+(c:/Users/bryan/OneDrive/CU/Code/asen6519_swarming/threeD_swarming/documentation and notes/swarm_control_1_draft.tex
+LaTeX2e <2024-11-01> patch level 2
+L3 programming layer <2025-01-18>
+
+! LaTeX Error: File `AIAA.cls' not found.
+
+Type X to quit or <RETURN> to proceed,
+or enter new name. (Default extension: cls)
+
+Enter file name: 
+c:/Users/bryan/OneDrive/CU/Code/asen6519_swarming/threeD_swarming/documentation and notes/swarm_control_1_draft.tex:2: Emergency stop.
+<read *> 
+         
+l.2 ^^M
+       
+*** (cannot \read from terminal in nonstop modes)
+
+ 
+Here is how much of TeX's memory you used:
+ 22 strings out of 473530
+ 799 string characters out of 5714794
+ 391471 words of memory out of 5000000
+ 23347 multiletter control sequences out of 15000+600000
+ 558837 words of font info for 36 fonts, out of 8000000 for 9000
+ 1141 hyphenation exceptions out of 8191
+ 19i,0n,29p,181b,17s stack positions out of 10000i,1000n,20000p,200000b,200000s
+c:/Users/bryan/OneDrive/CU/Code/asen6519_swarming/threeD_swarming/documentation and notes/swarm_control_1_draft.tex:2:  ==> Fatal error occurred, no output PDF file produced!

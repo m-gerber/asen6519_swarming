@@ -1,0 +1,140 @@
+\documentclass[conference]{AIAA}
+
+% Standard packages used throughout the project
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{siunitx}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+
+\title{Swarm Control Architecture for Multi-Mode UAV Teams}
+
+\author{AI4Fly Swarming Team\\University of Colorado Boulder}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This section documents the swarm-control logic implemented in the AI4Fly fire-patrol demonstrator.  The architecture spans a minimal 2-D leader--follower baseline and the operational 3-D controller used by \texttt{demo\_swarm\_run}.  We summarize the governing dynamics, describe the layered acceleration terms, discuss the multi-group and multi-mode management logic, and explain how the command-and-control interface supervises the swarm during scripted or language-model-generated missions.  The discussion emphasizes the physical interpretation of each term, parameter selections, and the empirical guarantees that motivate the current tuning.
+\end{abstract}
+
+\section{Dynamic Model and Numerical Integration}
+Each unmanned aerial vehicle (UAV) is modeled as a point mass with double-integrator dynamics
+\begin{equation}
+	\dot{\mathbf{p}}_i = \mathbf{v}_i, \qquad
+	\dot{\mathbf{v}}_i = \mathbf{a}_i,
+	\label{eq:dynamics}
+\end{equation}
+where \(\mathbf{p}_i,\mathbf{v}_i,\mathbf{a}_i \in \mathbb{R}^3\) are the position, velocity, and commanded acceleration of drone~$i$.  The simulation advances Eqs.~\eqref{eq:dynamics} with a fixed-step classical RK4 integrator (\(\Delta t = \SI{0.05}{s}\)), using the stage evaluations summarized in \texttt{doc.tex}.  The saturations
+\begin{equation}
+	\lVert \mathbf{a}_i \rVert \leq a_{\max}, \qquad
+	\lVert \mathbf{v}_i \rVert \leq v_{\max},
+\end{equation}
+with \(a_{\max}=\SI{6}{m/s^2}\) and \(v_{\max}=\SI{15}{m/s}\) enforce actuator and airspeed limits and are applied after each control update.
+
+\section{Layered Control Law}
+The commanded acceleration is the sum of physically motivated terms plus viscous damping,
+\begin{equation}
+	\mathbf{a}_i = \mathbf{a}_{\text{goal},i} + \mathbf{a}_{\text{align},i} + \mathbf{a}_{\text{sep},i} + \mathbf{a}_{\text{alt},i} + \mathbf{a}_{\text{obs},i} - c_d\,\mathbf{v}_i.
+	\label{eq:control}
+\end{equation}
+The coefficients in Table~\ref{tab:param_summary} match those used inside \texttt{demo\_swarm\_run.py}.
+
+\subsection{Goal Attraction}
+Each group maintains its own destination \(\mathbf{g}_g\).  Drones assigned to group~$g$ experience
+\begin{equation}
+	\mathbf{a}_{\text{goal},i} = k_g (\mathbf{g}_g - \mathbf{p}_i),
+\end{equation}
+which collapses to the global goal when the swarm is unsplit.  Navigation-only drones (mode \texttt{NAVIGATE}) temporarily double \(k_g\) to improve waypoint tracking.
+
+\subsection{Velocity Alignment}
+For drones that are actively swarming, the alignment term uses the group-average velocity \(\bar{\mathbf{v}}_g\) rather than the fleet-wide mean,
+\begin{equation}
+	\mathbf{a}_{\text{align},i} = k_a (\bar{\mathbf{v}}_g - \mathbf{v}_i).
+\end{equation}
+This mirrors Craig Reynolds' flocking rules and the behavior implemented in the 2-D \texttt{max\_simple\_swarming.py} prototype, where slider-adjusted weights tune alignment in real time.
+
+\subsection{Separation Regulation}
+Let \(\mathbf{r}_{ij} = \mathbf{p}_j - \mathbf{p}_i\) and \(d_{ij}=\lVert \mathbf{r}_{ij} \rVert\).  The separation contribution averages pairwise springs inside each group,
+\begin{equation}
+	\mathbf{a}_{\text{sep},i} = \frac{k_s}{\max(|\mathcal{G}_i|-1,1)} \sum_{j \in \mathcal{G}_i \setminus i} (d_{ij} - L_s^g) \frac{\mathbf{r}_{ij}}{d_{ij}},
+\end{equation}
+where \(\mathcal{G}_i\) is the membership set and \(L_s^g\) is the desired spacing (\SI{3}{m} for the reference scenario).  This term subsumes the leader-avoid separation used in the 2-D testbed while extending it to three dimensions with per-group tuning.
+
+\subsection{Altitude Regulation}
+Because the fire-patrol missions fly at low, legal altitudes, a proportional altitude term keeps each drone near the nominal flight level \(h^*\),
+\begin{equation}
+	\mathbf{a}_{\text{alt},i} = k_h (h^* - p_{i,z}) \, \hat{\mathbf{e}}_z.
+\end{equation}
+
+\subsection{Obstacle Repulsion}
+The module \texttt{obstacle\_repulsion.py} supports cylindrical fire columns and wall-like keep-out zones.  Given the minimum distance \(d_{ik}\) from drone~$i$ to obstacle~$k$, the short-range barrier
+\begin{equation}
+	f(d_{ik}) = \min\bigg\{ k_o\Big(\frac{1}{d_{ik}} - \frac{1}{d_{\text{safe}}}\Big), f_{\max} \bigg\}
+\end{equation}
+activates when \(d_{ik} < d_{\text{safe}}\) and induces \(\mathbf{a}_{\text{obs},i} = \sum_k f(d_{ik})\,\hat{\mathbf{n}}_{ik}\).  The wall helper constructs a local orthonormal frame so rectangular barriers can be imposed along ridgelines.
+
+\subsection{Damping and Saturation}
+The linear damping $c_d=0.25~\text{s}^{-1}$ stabilizes the double-integrator and prevents limit cycles even when alignment and cohesion temporarily conflict.  Once the superposition in Eq.~\eqref{eq:control} is evaluated, the norm of \(\mathbf{a}_i\) is clipped to \(a_{\max}\); velocities are clipped using the same scaling routine inside \texttt{demo\_swarm\_run.step\_swarm}.
+
+\begin{table}[t]
+	\centering
+	\caption{Nominal controller and simulation parameters.}
+	\label{tab:param_summary}
+	\begin{tabular}{@{}lll@{}}
+			oprule
+		Quantity & Symbol & Value \\
+		\midrule
+		Goal gain & $k_g$ & $\SI{0.02}{s^{-2}}$ \\
+		Alignment gain & $k_a$ & $\SI{0.6}{s^{-2}}$ \\
+		Separation gain & $k_s$ & $\SI{0.8}{s^{-2}}$ \\
+		Altitude gain & $k_h$ & $\SI{0.5}{s^{-2}}$ \\
+		Damping & $c_d$ & $\SI{0.25}{s^{-1}}$ \\
+		Desired spacing & $L_s$ & $\SI{3}{m}$ (initial scenario) \\
+		Obstacle gain & $k_o$ & $\SI{40}{m^2/s^2}$ \\
+		Influence radius & $d_{\text{safe}}$ & $\SI{12}{m}$ (\SI{150}{m} in fire patrol) \\
+		Acceleration cap & $a_{\max}$ & $\SI{6}{m/s^2}$ \\
+		Velocity cap & $v_{\max}$ & $\SI{15}{m/s}$ \\
+		Time step & $\Delta t$ & $\SI{0.05}{s}$ \\
+		Goal tolerance & --- & $\SI{5}{m}$ (for 20 steps) \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+\section{Multi-Group and Mode Management}
+The \texttt{SwarmManager} class tracks drone states, group assignments, and modal behavior (\texttt{SWARM}, \texttt{NAVIGATE}, \texttt{LOITER}, \texttt{REJOIN}, and \texttt{LANDED}).  Key behaviors include:
+\begin{itemize}
+	\item \textbf{Splitting:} \texttt{split\_drones} reassigns selected IDs to a new group with its own goal and spacing \(L_s^g\).  The group-level acceleration terms automatically restrict alignment and separation to local teammates, enabling the fire-investigation detachment described in \texttt{fire\_patrol\_demo.py}.
+	\item \textbf{Independent navigation:} Drones in \texttt{NAVIGATE} use waypoint lists with tighter attraction gains and stronger damping so they reach fire coordinates quickly without destabilizing the parent formation.
+	\item \textbf{Loiter and landing:} \texttt{set\_loiter} freezes drones at their current or commanded position for a duration, using the high-gain hold loop in \texttt{compute\_loiter\_accel}.  Once a group satisfies the goal tolerance consistently, \texttt{check\_group\_goal\_completion} locks it into \texttt{LANDED}, ensuring other rejoining drones adopt the same anchor point.
+	\item \textbf{Rejoin blending:} Drones marked for rejoin blend between waypoint pursuit and swarm control through a scalar \(\beta \in [0,1]\) updated via \texttt{update\_rejoin\_progress}.  This gradual handoff prevents transients when merging back into the main formation.
+\end{itemize}
+
+\section{Command and Supervisory Interfaces}
+High-level directives arrive as JSON files polled by \texttt{demo\_swarm\_run}.  The parser in \texttt{commands.py} validates and applies the following:
+\begin{enumerate}
+	\item Goal updates for the main or a specific group.
+	\item Dynamic group splits and rejoin requests.
+	\item Assignment of waypoint stacks to individual drones.
+	\item Timed loiter instructions and ad-hoc obstacle insertions.
+\end{enumerate}
+	During the fire-patrol mission, \texttt{fire\_patrol\_demo.py} pre-schedules these commands, while \texttt{supervisor.py} monitors \texttt{tracking\_logs/swarm\_tracking.csv} and, if any drone violates a geofenced hazard, writes an \texttt{update\_goal} command that redirects the formation toward a safe reroute point.  The language-model interface in \texttt{llm\_interface.py} produces the same schema, enabling natural-language interventions without modifying the controller core.
+
+\section{Relationship to 2-D Baseline}
+The \texttt{simple\_swarming/max\_simple\_swarming.py} script provides a continuously running, slider-controlled 2-D version of the flocking laws.  Although it only simulates planar motion with a virtual leader, the structure of Eq.~\eqref{eq:control} matches the 3-D controller: cohesion, alignment, separation, and leader following correspond to the goal and spacing terms in the full model, while the damping and velocity clamps mimic the same stabilizing behavior.  This baseline remains valuable for rapid intuition building and parameter studies before promoting changes into the full RK4-integrated stack.
+
+\section{Theoretical Guarantees and Practical Considerations}
+The swarm law inherits several desirable properties:
+\begin{itemize}
+	\item \textbf{Boundedness:} With positive damping and saturated accelerations, the energy of each drone decreases whenever the swarm is not being advected by strong goal or obstacle commands, preventing runaway velocities.
+	\item \textbf{Consensus tendencies:} The alignment and separation gains can be interpreted as discrete-time consensus terms that drive velocities toward a common value and positions toward a lattice with spacing \(L_s^g\), yielding cohesion once the swarm is sufficiently far from obstacles.
+	\item \textbf{Convergence heuristic:} The termination logic requires every drone to remain within \SI{5}{m} of its goal for \SI{1}{s}.  Although not a Lyapunov proof, this empirical criterion has been observed across hundreds of Monte Carlo trials and in all scripted fire-patrol runs.
+\end{itemize}
+The primary limitations mirror those listed in \texttt{doc.tex}: point-mass actuation, all-to-all information sharing, and static obstacle assumptions.  Nevertheless, the modular manager and command system make it straightforward to add sensing latency models, outer-loop planners, or moving hazards in future work.
+
+\section{Summary}
+The AI4Fly swarm controller combines a classical flocking-inspired inner loop, robust numerical integration, and a flexible supervisory layer that supports mission-specific splits, loiters, and reroutes.  The same core ideas span the 2-D interactive sandbox and the full 3-D demonstrator, enabling rapid iteration on parameters while maintaining physically interpretable behavior required for fire-patrol missions.
+
+\end{document}
